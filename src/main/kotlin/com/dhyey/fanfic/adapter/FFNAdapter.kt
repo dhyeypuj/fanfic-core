@@ -19,13 +19,14 @@ class FFNAdapter : FicAdapter {
             ?: throw IllegalStateException("HTML <title> tag not found")
 
         val title = rawTitle
+            .substringBefore(", a ")
             .substringBefore(" Chapter")
             .substringBefore(" | FanFiction")
             .trim()
 
         // ---------- AUTHOR ----------
         val profileTop = doc.selectFirst("#profile_top")
-            ?: throw IllegalStateException("profile_top section not found")
+            ?: throw IllegalStateException("profile_top not found")
 
         val author = profileTop
             .select("a.xcontrast_txt")
@@ -34,10 +35,9 @@ class FFNAdapter : FicAdapter {
             ?.trim()
             ?: throw IllegalStateException("Author not found")
 
-        // ---------- METADATA LINE ----------
         val metaText = profileTop.text()
 
-        val chapters = extractInt(metaText, "Chapters:")
+        val chapters = extractInt(metaText, "Chapters:").takeIf { it > 0 } ?: 1
         val words = extractInt(metaText, "Words:")
 
         val published = extractDate(metaText, "Published:")
@@ -61,7 +61,42 @@ class FFNAdapter : FicAdapter {
     }
 
     override fun parseChapters(html: String): List<Chapter> {
-        throw NotImplementedError("Chapter parsing not implemented yet")
+        val doc = Jsoup.parse(html)
+
+        val chapterSelect = doc.selectFirst("select#chap_select")
+
+        // ---------- MULTI-CHAPTER ----------
+        if (chapterSelect != null) {
+            return chapterSelect.select("option").map { option ->
+                val number = option.attr("value").toInt()
+                val title = option.text()
+                    .substringAfter(". ", option.text())
+                    .trim()
+
+                Chapter(
+                    id = "ffn:$number",
+                    number = number,
+                    title = title
+                )
+            }
+        }
+
+        // ---------- ONE-SHOT ----------
+        val rawTitle = doc.selectFirst("title")?.text()
+            ?: throw IllegalStateException("HTML <title> tag not found")
+
+        val storyTitle = rawTitle
+            .substringBefore(", a ")
+            .substringBefore(" | FanFiction")
+            .trim()
+
+        return listOf(
+            Chapter(
+                id = "ffn:1",
+                number = 1,
+                title = storyTitle
+            )
+        )
     }
 
     // ---------- HELPERS ----------
@@ -70,12 +105,11 @@ class FFNAdapter : FicAdapter {
         val start = text.indexOf(label)
         if (start == -1) return 0
 
-        val valuePart = text.substring(start + label.length)
+        return text.substring(start + label.length)
             .trim()
             .substringBefore(" ")
             .replace(",", "")
-
-        return valuePart.toIntOrNull() ?: 0
+            .toIntOrNull() ?: 0
     }
 
     private fun extractDate(text: String, label: String): String? {
