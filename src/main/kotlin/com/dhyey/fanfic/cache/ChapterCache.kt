@@ -28,4 +28,37 @@ class ChapterCache(
     fun deleteFicCache(ficId: String) {
         File(baseDir, ficId).deleteRecursively()
     }
+
+    // ---------- INSPECTION ----------
+
+    fun listCachedChapters(): List<CachedChapter> {
+        if (!baseDir.exists()) return emptyList()
+
+        return baseDir.listFiles()
+            ?.flatMap { ficDir ->
+                ficDir.listFiles()?.mapNotNull { file ->
+                    val chapterNumber = file.name
+                        .removePrefix("chapter_")
+                        .removeSuffix(".html")
+                        .toIntOrNull()
+                        ?: return@mapNotNull null
+
+                    CachedChapter(
+                        ficId = ficDir.name,
+                        chapterNumber = chapterNumber,
+                        path = file.absolutePath,
+                        cachedAt = file.lastModified(),
+                        sizeBytes = file.length()
+                    )
+                } ?: emptyList()
+            } ?: emptyList()
+    }
+
+    fun deleteChapter(path: String) {
+        File(path).delete()
+    }
+
+    fun totalCacheSizeBytes(): Long {
+        return listCachedChapters().sumOf { it.sizeBytes }
+    }
 }
