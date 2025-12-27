@@ -6,11 +6,15 @@ import com.dhyey.fanfic.storage.dao.ChapterDao
 import com.dhyey.fanfic.storage.dao.FicDao
 import com.dhyey.fanfic.storage.entity.ChapterEntity
 import com.dhyey.fanfic.storage.entity.FicEntity
+import com.dhyey.fanfic.update.UpdateChecker
+import com.dhyey.fanfic.update.UpdateResult
 
 class FanficRepository(
     private val ficDao: FicDao,
     private val chapterDao: ChapterDao
 ) {
+
+    private val updateChecker = UpdateChecker()
 
     suspend fun saveFic(
         ficId: String,
@@ -45,6 +49,31 @@ class FanficRepository(
 
         chapterDao.deleteChaptersForFic(ficId)
         chapterDao.upsertChapters(chapterEntities)
+    }
+
+    suspend fun checkForUpdates(
+        ficId: String,
+        freshMetadata: FicMetadata,
+        now: Long = System.currentTimeMillis()
+    ): UpdateResult {
+
+        val stored = ficDao.getFicById(ficId)
+            ?: return UpdateResult.NoChange
+
+        val result = updateChecker.checkForUpdate(stored, freshMetadata, now)
+
+        if (result !is UpdateResult.Skipped) {
+            ficDao.upsertFic(
+                stored.copy(
+                    chapters = freshMetadata.chapters,
+                    words = freshMetadata.words,
+                    updated = freshMetadata.updated,
+                    lastChecked = now
+                )
+            )
+        }
+
+        return result
     }
 
     suspend fun getFic(ficId: String): FicEntity? =
