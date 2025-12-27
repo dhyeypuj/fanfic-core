@@ -1,5 +1,6 @@
 package com.dhyey.fanfic.repository
 
+import com.dhyey.fanfic.cache.ChapterCache
 import com.dhyey.fanfic.model.Chapter
 import com.dhyey.fanfic.model.FicMetadata
 import com.dhyey.fanfic.storage.dao.ChapterDao
@@ -11,7 +12,8 @@ import com.dhyey.fanfic.update.UpdateResult
 
 class FanficRepository(
     private val ficDao: FicDao,
-    private val chapterDao: ChapterDao
+    private val chapterDao: ChapterDao,
+    private val chapterCache: ChapterCache
 ) {
 
     private val updateChecker = UpdateChecker()
@@ -43,12 +45,39 @@ class FanficRepository(
                 chapterNumber = chapter.number,
                 title = chapter.title,
                 localPath = null,
+                cachedAt = null,
                 lastReadPosition = 0
             )
         }
 
         chapterDao.deleteChaptersForFic(ficId)
         chapterDao.upsertChapters(chapterEntities)
+    }
+
+    suspend fun cacheChapterContent(
+        ficId: String,
+        chapterNumber: Int,
+        html: String
+    ) {
+        val path = chapterCache.writeChapter(ficId, chapterNumber, html)
+
+        val chapters = chapterDao.getChaptersForFic(ficId)
+        val chapter = chapters.first { it.chapterNumber == chapterNumber }
+
+        chapterDao.upsertChapters(
+            listOf(
+                chapter.copy(
+                    localPath = path,
+                    cachedAt = System.currentTimeMillis()
+                )
+            )
+        )
+    }
+
+    suspend fun loadChapterContent(chapter: ChapterEntity): String {
+        return chapter.localPath?.let {
+            chapterCache.readChapter(it)
+        } ?: throw IllegalStateException("Chapter not cached")
     }
 
     suspend fun checkForUpdates(
@@ -83,6 +112,7 @@ class FanficRepository(
         chapterDao.getChaptersForFic(ficId)
 
     suspend fun deleteFic(ficId: String) {
+        chapterCache.deleteFicCache(ficId)
         ficDao.deleteFic(ficId)
     }
 }
