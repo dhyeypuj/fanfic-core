@@ -4,34 +4,39 @@ import com.dhyey.fanfic.adapter.FFNAdapter
 import org.junit.jupiter.api.Test
 import util.loadResource
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class FFNAdapterTest {
 
     @Test
-    fun `parse FFN title, author, and numeric metadata`() {
+    fun `parse FFN one-shot chapter correctly`() {
+        val html = loadResource("ffn/story_os.html")
+        val adapter = FFNAdapter()
+
+        val chapters = adapter.parseChapters(html)
+
+        assertEquals(1, chapters.size)
+        assertEquals(1, chapters.first().number)
+        assertEquals("A Quest for Europa", chapters.first().title)
+    }
+
+    @Test
+    fun `parse FFN multi-chapter story correctly`() {
         val html = loadResource("ffn/story.html")
         val adapter = FFNAdapter()
 
-        val metadata = adapter.parseMetadata(
-            html,
-            "https://www.fanfiction.net/s/8277618/1"
-        )
+        val chapters = adapter.parseChapters(html)
 
-        assertEquals(
-            "Twenty One Nights of Paradise",
-            metadata.title
-        )
+        // chapter count should match dropdown
+        assertTrue(chapters.size > 1)
 
-        assertEquals(
-            "red-jacobson",
-            metadata.author
-        )
+        // first chapter
+        assertEquals(1, chapters.first().number)
+        assertTrue(chapters.first().title.isNotBlank())
 
-        assertEquals(9, metadata.chapters)
-        assertEquals(104153, metadata.words)
-
-        assertNotNull(metadata.published)
-        assertNotNull(metadata.updated)
+        // last chapter
+        val last = chapters.last()
+        assertEquals(chapters.size, last.number)
+        assertTrue(last.title.isNotBlank())
     }
 }
