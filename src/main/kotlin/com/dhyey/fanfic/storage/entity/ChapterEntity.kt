@@ -22,13 +22,16 @@ import androidx.room.PrimaryKey
 data class ChapterEntity(
 
     @PrimaryKey
-    val chapterId: String,     // e.g. "ffn:8277618:1"
+    val chapterId: String,
 
     val ficOwnerId: String,
-
     val chapterNumber: Int,
     val title: String,
 
-    val localPath: String?,    // where HTML/text will be cached later
-    val lastReadPosition: Int  // for reading progress (future)
+    // ---- OFFLINE READER FIELDS ----
+    val localPath: String?,          // filesystem path to cached HTML
+    val cachedAt: Long?,             // when this chapter was cached
+
+    // ---- READING PROGRESS ----
+    val lastReadPosition: Int        // cursor offset
 )
