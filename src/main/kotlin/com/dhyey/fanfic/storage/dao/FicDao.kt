@@ -1,0 +1,23 @@
+package com.dhyey.fanfic.storage.dao
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import com.dhyey.fanfic.storage.entity.FicEntity
+
+@Dao
+interface FicDao {
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertFic(fic: FicEntity)
+
+    @Query("SELECT * FROM fics WHERE ficId = :ficId")
+    suspend fun getFicById(ficId: String): FicEntity?
+
+    @Query("SELECT * FROM fics")
+    suspend fun getAllFics(): List<FicEntity>
+
+    @Query("DELETE FROM fics WHERE ficId = :ficId")
+    suspend fun deleteFic(ficId: String)
+}
