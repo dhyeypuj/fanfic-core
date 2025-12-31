@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.dhyey.fanfic.update.UpdateResult
-import com.dhyey.fanfic.R
+import com.dhyey.fanfic.core.R
 
 class AndroidUpdateNotifier(
     private val context: Context

@@ -1,22 +1,7 @@
 plugins {
-    kotlin("jvm") version "1.9.23"
-    kotlin("kapt") version "1.9.23"
-}
-
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    implementation("org.jsoup:jsoup:1.17.2")
-
-    // Room (Android-compatible)
-    implementation("androidx.room:room-runtime:2.6.1")
-    kapt("androidx.room:room-compiler:2.6.1")
-
-    testImplementation(kotlin("test"))
-}
-
-tasks.test {
-    useJUnitPlatform()
+    id("com.android.application") version "8.2.0" apply false
+    id("com.android.library") version "8.2.0" apply false
+    kotlin("android") version "1.9.23" apply false
+    kotlin("kapt") version "1.9.23" apply false
+    id("com.google.dagger.hilt.android") version "2.50" apply false
 }

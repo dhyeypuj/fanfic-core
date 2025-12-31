@@ -1,0 +1,110 @@
+package com.dhyey.fanfic.di
+
+import android.content.Context
+import androidx.room.Room
+import com.dhyey.fanfic.cache.CacheCleaner
+import com.dhyey.fanfic.cache.ChapterCache
+import com.dhyey.fanfic.network.FicFetcher
+import com.dhyey.fanfic.network.WebViewFetcher
+import com.dhyey.fanfic.reader.ProgressRepository
+import com.dhyey.fanfic.reader.ReaderRepository
+import com.dhyey.fanfic.repository.FanficRepository
+import com.dhyey.fanfic.storage.FanficDatabase
+import com.dhyey.fanfic.storage.dao.ChapterDao
+import com.dhyey.fanfic.storage.dao.FicDao
+import com.dhyey.fanfic.storage.dao.ReadingProgressDao
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import okhttp3.OkHttpClient
+import java.io.File
+import java.util.concurrent.TimeUnit
+import javax.inject.Singleton
+
+@Module
+@InstallIn(SingletonComponent::class)
+object AppModule {
+
+    @Provides
+    @Singleton
+    fun provideDatabase(@ApplicationContext context: Context): FanficDatabase {
+        return Room.databaseBuilder(
+            context,
+            FanficDatabase::class.java,
+            "fanfic_database"
+        ).build()
+    }
+
+    @Provides
+    fun provideFicDao(database: FanficDatabase): FicDao = database.ficDao()
+
+    @Provides
+    fun provideChapterDao(database: FanficDatabase): ChapterDao = database.chapterDao()
+
+    @Provides
+    fun provideReadingProgressDao(database: FanficDatabase): ReadingProgressDao =
+        database.readingProgressDao()
+
+    @Provides
+    @Singleton
+    fun provideChapterCache(@ApplicationContext context: Context): ChapterCache {
+        val cacheDir = File(context.cacheDir, "chapters")
+        return ChapterCache(cacheDir)
+    }
+
+    @Provides
+    @Singleton
+    fun provideCacheCleaner(
+        chapterCache: ChapterCache
+    ): CacheCleaner {
+        return CacheCleaner(chapterCache)
+    }
+
+    @Provides
+    @Singleton
+    fun provideFanficRepository(
+        ficDao: FicDao,
+        chapterDao: ChapterDao,
+        chapterCache: ChapterCache,
+        cacheCleaner: CacheCleaner
+    ): FanficRepository {
+        return FanficRepository(ficDao, chapterDao, chapterCache, cacheCleaner)
+    }
+
+    @Provides
+    @Singleton
+    fun provideReaderRepository(
+        fanficRepository: FanficRepository
+    ): ReaderRepository {
+        return ReaderRepository(fanficRepository)
+    }
+
+    @Provides
+    @Singleton
+    fun provideProgressRepository(
+        readingProgressDao: ReadingProgressDao
+    ): ProgressRepository {
+        return ProgressRepository(readingProgressDao)
+    }
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(): OkHttpClient {
+        return OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideFicFetcher(
+        okHttpClient: OkHttpClient,
+        webViewFetcher: WebViewFetcher
+    ): FicFetcher {
+        return FicFetcher(okHttpClient, webViewFetcher)
+    }
+}
