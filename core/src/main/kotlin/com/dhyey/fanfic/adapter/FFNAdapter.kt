@@ -15,8 +15,12 @@ class FFNAdapter : FicAdapter {
         val doc = Jsoup.parse(html)
 
         // ---------- TITLE ----------
+        // Try multiple selectors for title (desktop and mobile)
         val rawTitle = doc.selectFirst("title")?.text()
-            ?: throw IllegalStateException("HTML <title> tag not found")
+            ?: doc.selectFirst("h1")?.text()
+            ?: doc.selectFirst(".storytitle")?.text()
+            ?: doc.selectFirst("b.xcontrast_txt")?.text()
+            ?: "Unknown Title"
 
         val title = rawTitle
             .substringBefore(", a ")
@@ -25,17 +29,17 @@ class FFNAdapter : FicAdapter {
             .trim()
 
         // ---------- AUTHOR ----------
-        val profileTop = doc.selectFirst("#profile_top")
-            ?: throw IllegalStateException("profile_top not found")
+        // Try multiple selectors for author (desktop and mobile)
+        val author = doc.selectFirst("#profile_top a.xcontrast_txt")?.text()?.trim()
+            ?: doc.selectFirst("a[href^=/u/]")?.text()?.trim()
+            ?: doc.selectFirst(".author")?.text()?.trim()
+            ?: "Unknown Author"
 
-        val author = profileTop
-            .select("a.xcontrast_txt")
-            .firstOrNull()
-            ?.text()
-            ?.trim()
-            ?: throw IllegalStateException("Author not found")
-
-        val metaText = profileTop.text()
+        // ---------- METADATA ----------
+        val metaText = doc.selectFirst("#profile_top")?.text()
+            ?: doc.selectFirst(".xgray")?.text()
+            ?: doc.body()?.text()
+            ?: ""
 
         val chapters = extractInt(metaText, "Chapters:").takeIf { it > 0 } ?: 1
         val words = extractInt(metaText, "Words:")
