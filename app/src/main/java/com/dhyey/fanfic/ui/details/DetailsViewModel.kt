@@ -105,6 +105,48 @@ class DetailsViewModel @Inject constructor(
         _downloadState.value = DownloadState(isDownloading = false)
     }
 
+    fun clearChapterCache(chapterNumber: Int) {
+        viewModelScope.launch {
+            repository.clearChapterCache(ficId, chapterNumber)
+            loadDetails()
+        }
+    }
+
+    fun downloadSingleChapter(chapterNumber: Int) {
+        val state = _uiState.value
+        if (state !is DetailsUiState.Success || _downloadState.value.isDownloading) return
+
+        viewModelScope.launch {
+            val fic = state.fic
+            val chapter = state.chapters.firstOrNull { it.chapterNumber == chapterNumber } ?: return@launch
+
+            _downloadState.value = DownloadState(
+                isDownloading = true,
+                progress = 0,
+                total = 1,
+                currentChapter = chapter.title
+            )
+
+            try {
+                val html = ficFetcher.fetchChapterContent(fic.url, chapterNumber)
+                val storyContent = extractStoryContent(html)
+                repository.cacheChapterContent(ficId, chapterNumber, storyContent, 50 * 1024 * 1024)
+            } catch (e: Exception) {
+                // Download failed
+            }
+
+            _downloadState.value = DownloadState(isDownloading = false)
+            loadDetails()
+        }
+    }
+
+    fun clearAllOfflineCache() {
+        viewModelScope.launch {
+            repository.clearAllOfflineCache(ficId)
+            loadDetails()
+        }
+    }
+
     fun deleteFic() {
         viewModelScope.launch {
             repository.deleteFic(ficId)

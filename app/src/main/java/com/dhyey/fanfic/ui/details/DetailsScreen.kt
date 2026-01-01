@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -30,6 +31,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -120,6 +122,9 @@ fun DetailsScreen(
                     downloadState = downloadState,
                     onChapterClick = onChapterClick,
                     onDownloadClick = { viewModel.downloadAllChapters() },
+                    onDownloadChapter = { viewModel.downloadSingleChapter(it) },
+                    onRemoveChapterCache = { viewModel.clearChapterCache(it) },
+                    onClearCacheClick = { viewModel.clearAllOfflineCache() },
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -158,6 +163,9 @@ private fun DetailsContent(
     downloadState: DownloadState,
     onChapterClick: (Int) -> Unit,
     onDownloadClick: () -> Unit,
+    onDownloadChapter: (Int) -> Unit,
+    onRemoveChapterCache: (Int) -> Unit,
+    onClearCacheClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val cachedCount = chapters.count { it.localPath != null }
@@ -172,7 +180,8 @@ private fun DetailsContent(
                 fic = fic,
                 cachedCount = cachedCount,
                 downloadState = downloadState,
-                onDownloadClick = onDownloadClick
+                onDownloadClick = onDownloadClick,
+                onClearCacheClick = onClearCacheClick
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
@@ -186,7 +195,10 @@ private fun DetailsContent(
             ChapterItem(
                 chapter = chapter,
                 chapterNumber = index + 1,
-                onClick = { onChapterClick(chapter.chapterNumber) }
+                isDownloading = downloadState.isDownloading,
+                onClick = { onChapterClick(chapter.chapterNumber) },
+                onDownload = { onDownloadChapter(chapter.chapterNumber) },
+                onRemoveCache = { onRemoveChapterCache(chapter.chapterNumber) }
             )
         }
     }
@@ -197,7 +209,8 @@ private fun FicHeader(
     fic: FicEntity,
     cachedCount: Int,
     downloadState: DownloadState,
-    onDownloadClick: () -> Unit
+    onDownloadClick: () -> Unit,
+    onClearCacheClick: () -> Unit
 ) {
     Column {
         Text(
@@ -297,22 +310,33 @@ private fun FicHeader(
                 Text("Download for Offline (${fic.chapters - cachedCount} chapters)")
             }
         } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Available Offline",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Available Offline",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onClearCacheClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.DeleteOutline, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Remove Offline Data")
+                }
             }
         }
     }
@@ -322,8 +346,13 @@ private fun FicHeader(
 private fun ChapterItem(
     chapter: ChapterEntity,
     chapterNumber: Int,
-    onClick: () -> Unit
+    isDownloading: Boolean,
+    onClick: () -> Unit,
+    onDownload: () -> Unit,
+    onRemoveCache: () -> Unit
 ) {
+    val isCached = chapter.localPath != null
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -335,7 +364,7 @@ private fun ChapterItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -344,19 +373,45 @@ private fun ChapterItem(
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(end = 12.dp)
             )
-            Text(
-                text = chapter.title,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            if (chapter.localPath != null) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "✓",
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 8.dp)
+                    text = chapter.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
+                if (isCached) {
+                    Text(
+                        text = "Available offline",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            
+            // Cache action button
+            if (isCached) {
+                IconButton(
+                    onClick = onRemoveCache,
+                    enabled = !isDownloading
+                ) {
+                    Icon(
+                        Icons.Default.DeleteOutline,
+                        contentDescription = "Remove from offline",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            } else {
+                IconButton(
+                    onClick = onDownload,
+                    enabled = !isDownloading
+                ) {
+                    Icon(
+                        Icons.Default.Download,
+                        contentDescription = "Download for offline",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }

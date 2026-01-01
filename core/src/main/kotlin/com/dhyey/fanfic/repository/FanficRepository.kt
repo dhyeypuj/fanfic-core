@@ -128,4 +128,25 @@ class FanficRepository(
 
     suspend fun getChapters(ficId: String): List<ChapterEntity> =
         chapterDao.getChaptersForFic(ficId)
+
+    suspend fun clearChapterCache(ficId: String, chapterNumber: Int) {
+        val chapters = chapterDao.getChaptersForFic(ficId)
+        val chapter = chapters.firstOrNull { it.chapterNumber == chapterNumber } ?: return
+        
+        chapter.localPath?.let { path ->
+            chapterCache.deleteChapter(path)
+        }
+        
+        chapterDao.upsertChapters(
+            listOf(chapter.copy(localPath = null, cachedAt = null))
+        )
+    }
+
+    suspend fun clearAllOfflineCache(ficId: String) {
+        chapterCache.deleteFicCache(ficId)
+        
+        val chapters = chapterDao.getChaptersForFic(ficId)
+        val clearedChapters = chapters.map { it.copy(localPath = null, cachedAt = null) }
+        chapterDao.upsertChapters(clearedChapters)
+    }
 }
