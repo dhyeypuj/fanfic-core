@@ -1,5 +1,6 @@
 package com.dhyey.fanfic.network
 
+import com.dhyey.fanfic.adapter.AO3Adapter
 import com.dhyey.fanfic.adapter.FFNAdapter
 import com.dhyey.fanfic.adapter.FicAdapter
 import com.dhyey.fanfic.model.Chapter
@@ -15,7 +16,8 @@ class FicFetcher @Inject constructor(
     private val webViewFetcher: WebViewFetcher
 ) {
     private val adapters: List<FicAdapter> = listOf(
-        FFNAdapter()
+        FFNAdapter(),
+        AO3Adapter()
     )
 
     private fun getAdapter(url: String): FicAdapter {
@@ -24,15 +26,12 @@ class FicFetcher @Inject constructor(
     }
 
     suspend fun fetchHtml(url: String): String {
-        // Normalize URL to use www
-        val normalizedUrl = url
-            .replace("m.fanfiction.net", "www.fanfiction.net")
-            .replace("://fanfiction.net/", "://www.fanfiction.net/")
+        val normalizedUrl = normalizeUrl(url)
 
         // Try OkHttp first (faster)
         try {
             val html = fetchWithOkHttp(normalizedUrl)
-            if (isValidHtml(html)) {
+            if (isValidHtml(html, normalizedUrl)) {
                 return html
             }
         } catch (e: Exception) {
@@ -41,6 +40,21 @@ class FicFetcher @Inject constructor(
 
         // Fall back to WebView (handles Cloudflare)
         return webViewFetcher.fetchHtml(normalizedUrl)
+    }
+
+    private fun normalizeUrl(url: String): String {
+        return when {
+            // FFN normalization
+            url.contains("fanfiction.net") -> url
+                .replace("m.fanfiction.net", "www.fanfiction.net")
+                .replace("://fanfiction.net/", "://www.fanfiction.net/")
+            
+            // AO3 normalization
+            url.contains("ao3.org") -> url
+                .replace("ao3.org", "archiveofourown.org")
+            
+            else -> url
+        }
     }
 
     private suspend fun fetchWithOkHttp(url: String): String = withContext(Dispatchers.IO) {
@@ -64,12 +78,25 @@ class FicFetcher @Inject constructor(
         }
     }
 
-    private fun isValidHtml(html: String): Boolean {
-        return html.contains("<title>") && 
-               html.contains("profile_top") && 
-               !html.contains("challenge-running") &&
-               !html.contains("cf-spinner") &&
-               !html.contains("Just a moment")
+    private fun isValidHtml(html: String, url: String): Boolean {
+        // Common validity checks
+        if (!html.contains("<title>") ||
+            html.contains("challenge-running") ||
+            html.contains("cf-spinner") ||
+            html.contains("Just a moment")) {
+            return false
+        }
+
+        return when {
+            // FFN-specific checks
+            url.contains("fanfiction.net") -> html.contains("profile_top")
+            
+            // AO3-specific checks
+            url.contains("archiveofourown.org") -> 
+                html.contains("workskin") || html.contains("preface group")
+            
+            else -> true
+        }
     }
 
     suspend fun fetchMetadata(url: String): FicMetadata {
@@ -84,20 +111,67 @@ class FicFetcher @Inject constructor(
         return adapter.parseChapters(html)
     }
 
-    suspend fun fetchChapterContent(baseUrl: String, chapterNumber: Int): String {
-        val chapterUrl = buildChapterUrl(baseUrl, chapterNumber)
+    /**
+     * Fetch chapter content. For AO3, pass the full chapterId (e.g., "ao3:32705163")
+     * to navigate to a specific chapter. For FFN, only chapterNumber is needed.
+     */
+    suspend fun fetchChapterContent(baseUrl: String, chapterNumber: Int, chapterId: String? = null): String {
+        val chapterUrl = buildChapterUrl(baseUrl, chapterNumber, chapterId)
         return fetchHtml(chapterUrl)
     }
 
-    private fun buildChapterUrl(baseUrl: String, chapterNumber: Int): String {
-        // FFN URL pattern: https://www.fanfiction.net/s/{id}/{chapter}/{title}
-        val parts = baseUrl.trimEnd('/').split("/")
-        val sIndex = parts.indexOf("s")
-        if (sIndex != -1 && sIndex + 1 < parts.size) {
-            val base = parts.take(sIndex + 2).joinToString("/")
-            return "$base/$chapterNumber"
+    private fun buildChapterUrl(baseUrl: String, chapterNumber: Int, chapterId: String? = null): String {
+        return when {
+            // FFN URL pattern: https://www.fanfiction.net/s/{id}/{chapter}/{title}
+            baseUrl.contains("fanfiction.net") -> {
+                val parts = baseUrl.trimEnd('/').split("/")
+                val sIndex = parts.indexOf("s")
+                if (sIndex != -1 && sIndex + 1 < parts.size) {
+                    val base = parts.take(sIndex + 2).joinToString("/")
+                    "$base/$chapterNumber"
+                } else {
+                    baseUrl
+                }
+            }
+            
+            // AO3 URL pattern: https://archiveofourown.org/works/{workId}/chapters/{chapterId}
+            baseUrl.contains("archiveofourown.org") -> {
+                val workIdMatch = Regex("/works/(\\d+)").find(baseUrl)
+                val workId = workIdMatch?.groupValues?.get(1)
+                
+                if (workId != null && chapterId != null) {
+                    // Extract the numeric chapter ID from "ao3:32705163" format
+                    val numericChapterId = chapterId.removePrefix("ao3:")
+                    "https://archiveofourown.org/works/$workId/chapters/$numericChapterId?view_adult=true"
+                } else if (workId != null) {
+                    // No chapter ID - fetch the first chapter / work page
+                    "https://archiveofourown.org/works/$workId?view_adult=true"
+                } else {
+                    baseUrl
+                }
+            }
+            
+            else -> baseUrl
         }
-        return baseUrl
+    }
+
+    /**
+     * Parses chapter content from the fetched HTML.
+     * Uses the appropriate adapter based on the URL.
+     */
+    fun parseChapterContent(html: String, url: String): String {
+        return when {
+            url.contains("archiveofourown.org") -> {
+                (getAdapter(url) as? AO3Adapter)?.parseChapterContent(html) ?: ""
+            }
+            url.contains("fanfiction.net") -> {
+                // FFN content is in #storytext
+                val doc = org.jsoup.Jsoup.parse(html)
+                doc.selectFirst("#storytext")?.html() ?: ""
+            }
+            else -> ""
+        }
     }
 }
+
 

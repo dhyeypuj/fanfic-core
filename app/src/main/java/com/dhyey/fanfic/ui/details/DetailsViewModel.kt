@@ -88,8 +88,8 @@ class DetailsViewModel @Inject constructor(
                         currentChapter = chapter.title
                     )
 
-                    val html = ficFetcher.fetchChapterContent(fic.url, chapter.chapterNumber)
-                    val storyContent = extractStoryContent(html)
+                    val html = ficFetcher.fetchChapterContent(fic.url, chapter.chapterNumber, chapter.chapterId)
+                    val storyContent = ficFetcher.parseChapterContent(html, fic.url).ifBlank { extractStoryContent(html) }
                     repository.cacheChapterContent(ficId, chapter.chapterNumber, storyContent, 50 * 1024 * 1024)
                 } catch (e: Exception) {
                     // Skip failed chapters, continue with others
@@ -128,8 +128,8 @@ class DetailsViewModel @Inject constructor(
             )
 
             try {
-                val html = ficFetcher.fetchChapterContent(fic.url, chapterNumber)
-                val storyContent = extractStoryContent(html)
+                val html = ficFetcher.fetchChapterContent(fic.url, chapterNumber, chapter.chapterId)
+                val storyContent = ficFetcher.parseChapterContent(html, fic.url).ifBlank { extractStoryContent(html) }
                 repository.cacheChapterContent(ficId, chapterNumber, storyContent, 50 * 1024 * 1024)
             } catch (e: Exception) {
                 // Download failed

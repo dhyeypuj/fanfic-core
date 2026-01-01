@@ -104,7 +104,7 @@ fun AddFicScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "Supported sites: FanFiction.net",
+                text = "Supported sites: FanFiction.net, Archive of Our Own (AO3)",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

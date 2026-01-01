@@ -105,11 +105,11 @@ class ReaderViewModel @Inject constructor(
                         repository.loadChapterContent(chapterEntity)
                     } catch (e: Exception) {
                         // Cache corrupted, re-fetch
-                        fetchAndCacheChapter(ficEntity, chapter)
+                        fetchAndCacheChapter(ficEntity, chapter, chapterEntity?.chapterId)
                     }
                 } else {
                     // Fetch and cache for offline use
-                    fetchAndCacheChapter(ficEntity, chapter)
+                    fetchAndCacheChapter(ficEntity, chapter, chapterEntity?.chapterId)
                 }
 
                 // Get saved reading position for this chapter
@@ -131,18 +131,23 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    private suspend fun fetchAndCacheChapter(ficEntity: FicEntity, chapter: Int): String {
-        val html = ficFetcher.fetchChapterContent(ficEntity.url, chapter)
-        val storyContent = extractStoryContent(html)
+    private suspend fun fetchAndCacheChapter(ficEntity: FicEntity, chapter: Int, chapterId: String? = null): String {
+        // Pass chapterId for AO3 individual chapter navigation
+        val html = ficFetcher.fetchChapterContent(ficEntity.url, chapter, chapterId)
+        // Use site-aware content parsing from FicFetcher
+        val storyContent = ficFetcher.parseChapterContent(html, ficEntity.url)
+        
+        // If parseChapterContent returns empty, fallback to legacy extraction
+        val contentToCache = storyContent.ifBlank { extractStoryContent(html) }
         
         // Cache for offline reading (10MB max cache)
         try {
-            repository.cacheChapterContent(ficEntity.ficId, chapter, storyContent, 10 * 1024 * 1024)
+            repository.cacheChapterContent(ficEntity.ficId, chapter, contentToCache, 10 * 1024 * 1024)
         } catch (e: Exception) {
             // Caching failed, but we can still show the content
         }
         
-        return storyContent
+        return contentToCache
     }
 
     fun nextChapter() {

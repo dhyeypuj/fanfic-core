@@ -1,7 +1,7 @@
 package adapter
 
 import com.dhyey.fanfic.adapter.FFNAdapter
-import org.junit.jupiter.api.Test
+import org.junit.Test
 import util.loadResource
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -40,3 +40,4 @@ class FFNAdapterTest {
         assertTrue(last.title.isNotBlank())
     }
 }
+
