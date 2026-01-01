@@ -169,11 +169,13 @@ class FanficRepository(
     }
 
     /**
-     * Updates an existing fic's metadata from fresh data while preserving dateAdded and lastReadAt.
+     * Updates an existing fic's metadata from fresh data.
+     * ONLY updates the FicEntity - does NOT touch chapters at all to preserve cache.
      */
     suspend fun updateFicMetadata(ficId: String, metadata: FicMetadata, chapters: List<Chapter>) {
         val existingFic = ficDao.getFicById(ficId) ?: return
         
+        // Update ONLY fic metadata - completely skip chapter operations
         val updatedFic = existingFic.copy(
             title = metadata.title,
             author = metadata.author,
@@ -185,40 +187,12 @@ class FanficRepository(
             isComplete = metadata.isComplete
             // dateAdded and lastReadAt are preserved from existingFic
         )
+        ficDao.updateFic(updatedFic)  // Use updateFic, NOT upsertFic, to avoid CASCADE DELETE
         
-        ficDao.upsertFic(updatedFic)
-        
-        // Update chapters list
-        val chapterEntities = chapters.map { chapter ->
-            ChapterEntity(
-                chapterId = chapter.id,
-                ficOwnerId = ficId,
-                chapterNumber = chapter.number,
-                title = chapter.title,
-                localPath = null,
-                cachedAt = null,
-                lastReadPosition = 0
-            )
-        }
-        
-        // Preserve cached chapters
-        val existingChapters = chapterDao.getChaptersForFic(ficId)
-        val mergedChapters = chapterEntities.map { newChapter ->
-            val existing = existingChapters.find { it.chapterNumber == newChapter.chapterNumber }
-            if (existing != null) {
-                newChapter.copy(
-                    localPath = existing.localPath,
-                    cachedAt = existing.cachedAt,
-                    lastReadPosition = existing.lastReadPosition
-                )
-            } else {
-                newChapter
-            }
-        }
-        
-        chapterDao.deleteChaptersForFic(ficId)
-        chapterDao.upsertChapters(mergedChapters)
+        // DO NOT touch chapters - they are already in database with cache info
+        // New chapters will be discovered when user opens reader and navigates
     }
 }
+
 
 

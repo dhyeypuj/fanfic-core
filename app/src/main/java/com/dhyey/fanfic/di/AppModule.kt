@@ -61,8 +61,8 @@ object AppModule {
     @Provides
     @Singleton
     fun provideChapterCache(@ApplicationContext context: Context): ChapterCache {
-        val cacheDir = File(context.cacheDir, "chapters")
-        return ChapterCache(cacheDir)
+        val filesDir = File(context.filesDir, "chapters")
+        return ChapterCache(filesDir)
     }
 
     @Provides
