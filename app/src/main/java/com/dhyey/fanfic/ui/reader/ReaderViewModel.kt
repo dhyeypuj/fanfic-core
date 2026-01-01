@@ -91,11 +91,16 @@ class ReaderViewModel @Inject constructor(
                 val chapterEntity = chapters.firstOrNull { it.chapterNumber == chapter }
 
                 val htmlContent = if (chapterEntity?.localPath != null) {
-                    repository.loadChapterContent(chapterEntity)
+                    // Load from cache
+                    try {
+                        repository.loadChapterContent(chapterEntity)
+                    } catch (e: Exception) {
+                        // Cache corrupted, re-fetch
+                        fetchAndCacheChapter(ficEntity, chapter)
+                    }
                 } else {
-                    val html = ficFetcher.fetchChapterContent(ficEntity.url, chapter)
-                    // Extract story content from HTML
-                    extractStoryContent(html)
+                    // Fetch and cache for offline use
+                    fetchAndCacheChapter(ficEntity, chapter)
                 }
 
                 currentChapter = chapter
@@ -111,6 +116,20 @@ class ReaderViewModel @Inject constructor(
                 _uiState.value = ReaderUiState.Error(e.message ?: "Failed to load chapter")
             }
         }
+    }
+
+    private suspend fun fetchAndCacheChapter(ficEntity: FicEntity, chapter: Int): String {
+        val html = ficFetcher.fetchChapterContent(ficEntity.url, chapter)
+        val storyContent = extractStoryContent(html)
+        
+        // Cache for offline reading (10MB max cache)
+        try {
+            repository.cacheChapterContent(ficEntity.ficId, chapter, storyContent, 10 * 1024 * 1024)
+        } catch (e: Exception) {
+            // Caching failed, but we can still show the content
+        }
+        
+        return storyContent
     }
 
     fun nextChapter() {

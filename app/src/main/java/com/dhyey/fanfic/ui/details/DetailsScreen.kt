@@ -11,11 +11,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -23,6 +27,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -52,6 +58,7 @@ fun DetailsScreen(
     viewModel: DetailsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val downloadState by viewModel.downloadState.collectAsState()
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -110,7 +117,9 @@ fun DetailsScreen(
                 DetailsContent(
                     fic = state.fic,
                     chapters = state.chapters,
+                    downloadState = downloadState,
                     onChapterClick = onChapterClick,
+                    onDownloadClick = { viewModel.downloadAllChapters() },
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -146,16 +155,25 @@ fun DetailsScreen(
 private fun DetailsContent(
     fic: FicEntity,
     chapters: List<ChapterEntity>,
+    downloadState: DownloadState,
     onChapterClick: (Int) -> Unit,
+    onDownloadClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val cachedCount = chapters.count { it.localPath != null }
+    
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
-            FicHeader(fic)
+            FicHeader(
+                fic = fic,
+                cachedCount = cachedCount,
+                downloadState = downloadState,
+                onDownloadClick = onDownloadClick
+            )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "Chapters",
@@ -175,7 +193,12 @@ private fun DetailsContent(
 }
 
 @Composable
-private fun FicHeader(fic: FicEntity) {
+private fun FicHeader(
+    fic: FicEntity,
+    cachedCount: Int,
+    downloadState: DownloadState,
+    onDownloadClick: () -> Unit
+) {
     Column {
         Text(
             text = fic.title,
@@ -213,6 +236,82 @@ private fun FicHeader(fic: FicEntity) {
                     text = "Words",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Column {
+                Text(
+                    text = "$cachedCount/${fic.chapters}",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = if (cachedCount == fic.chapters) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Offline",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Download button
+        if (downloadState.isDownloading) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Downloading ${downloadState.progress + 1}/${downloadState.total}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    if (downloadState.currentChapter.isNotEmpty()) {
+                        Text(
+                            text = downloadState.currentChapter,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                LinearProgressIndicator(
+                    progress = { (downloadState.progress + 1).toFloat() / downloadState.total },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(4.dp)
+                )
+            }
+        } else if (cachedCount < fic.chapters) {
+            Button(
+                onClick = onDownloadClick,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Download, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Download for Offline (${fic.chapters - cachedCount} chapters)")
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Available Offline",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
         }
