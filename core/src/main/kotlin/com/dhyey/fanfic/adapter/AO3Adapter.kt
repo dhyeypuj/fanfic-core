@@ -50,15 +50,26 @@ class AO3Adapter : FicAdapter {
         val wordsText = doc.selectFirst("dd.words")?.text()?.replace(",", "")?.trim() ?: "0"
         val words = wordsText.toIntOrNull() ?: 0
 
-        // ---------- CHAPTER COUNT ----------
+        // ---------- CHAPTER COUNT & COMPLETION STATUS ----------
+        // Format: "50/50" = complete, "10/?" = ongoing
+        val chaptersText = doc.selectFirst("dd.chapters")?.text()?.trim() ?: "1/1"
+        val chapterParts = chaptersText.split("/")
+        val currentChapters = chapterParts.getOrNull(0)?.toIntOrNull() ?: 1
+        val totalChapters = chapterParts.getOrNull(1)?.toIntOrNull()
+        
         // First try to count from dropdown (more accurate for multi-chapter)
         val chapterDropdown = doc.selectFirst("select#selected_id")
         val chapters = if (chapterDropdown != null) {
             chapterDropdown.select("option").size
         } else {
-            // Fallback to stats dd.chapters (format: "X/Y" or "X/?")
-            val chaptersText = doc.selectFirst("dd.chapters")?.text()?.trim() ?: "1/1"
-            chaptersText.substringBefore("/").toIntOrNull() ?: 1
+            currentChapters
+        }
+        
+        // Complete if total is a number and equals current, or if there's only 1 chapter
+        val isComplete = when {
+            totalChapters != null && totalChapters == currentChapters -> true
+            chaptersText == "1/1" -> true
+            else -> false
         }
 
         // ---------- DATES ----------
@@ -78,7 +89,8 @@ class AO3Adapter : FicAdapter {
             chapters = chapters,
             words = words,
             published = published,
-            updated = updated
+            updated = updated,
+            isComplete = isComplete
         )
     }
 

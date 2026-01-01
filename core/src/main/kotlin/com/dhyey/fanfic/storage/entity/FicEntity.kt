@@ -21,5 +21,11 @@ data class FicEntity(
     val published: String?,
     val updated: String?,
 
-    val lastChecked: Long      // epoch millis
+    val lastChecked: Long,      // epoch millis
+
+    // Sorting & filtering fields
+    val dateAdded: Long = System.currentTimeMillis(),  // when added to library
+    val lastReadAt: Long? = null,                       // when last opened in reader
+    val isComplete: Boolean = false                     // whether story is complete
 )
+

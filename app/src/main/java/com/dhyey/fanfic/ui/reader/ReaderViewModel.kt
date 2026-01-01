@@ -54,6 +54,10 @@ class ReaderViewModel @Inject constructor(
 
     init {
         loadChapter(initialChapter)
+        // Update lastReadAt for "Last Read" sorting
+        viewModelScope.launch {
+            repository.updateLastRead(ficId)
+        }
     }
 
     fun toggleSettings() {

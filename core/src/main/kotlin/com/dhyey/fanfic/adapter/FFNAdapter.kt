@@ -46,6 +46,9 @@ class FFNAdapter : FicAdapter {
 
         val published = extractDate(metaText, "Published:")
         val updated = extractDate(metaText, "Updated:")
+        
+        // FFN shows "Status: Complete" in the metadata for completed stories
+        val isComplete = metaText.contains("Status: Complete", ignoreCase = true)
 
         return FicMetadata(
             site = FicSite.FFN,
@@ -60,7 +63,8 @@ class FFNAdapter : FicAdapter {
             chapters = chapters,
             words = words,
             published = published,
-            updated = updated
+            updated = updated,
+            isComplete = isComplete
         )
     }
 

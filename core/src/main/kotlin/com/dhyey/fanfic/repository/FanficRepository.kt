@@ -35,7 +35,10 @@ class FanficRepository(
             words = metadata.words,
             published = metadata.published,
             updated = metadata.updated,
-            lastChecked = System.currentTimeMillis()
+            lastChecked = System.currentTimeMillis(),
+            dateAdded = System.currentTimeMillis(),
+            lastReadAt = null,
+            isComplete = metadata.isComplete
         )
 
         ficDao.upsertFic(ficEntity)
@@ -160,4 +163,62 @@ class FanficRepository(
         val chapters = chapterDao.getChaptersForFic(ficId)
         return chapters.firstOrNull { it.chapterNumber == chapterNumber }?.lastReadPosition ?: 0
     }
+
+    suspend fun updateLastRead(ficId: String) {
+        ficDao.updateLastReadAt(ficId, System.currentTimeMillis())
+    }
+
+    /**
+     * Updates an existing fic's metadata from fresh data while preserving dateAdded and lastReadAt.
+     */
+    suspend fun updateFicMetadata(ficId: String, metadata: FicMetadata, chapters: List<Chapter>) {
+        val existingFic = ficDao.getFicById(ficId) ?: return
+        
+        val updatedFic = existingFic.copy(
+            title = metadata.title,
+            author = metadata.author,
+            chapters = metadata.chapters,
+            words = metadata.words,
+            published = metadata.published,
+            updated = metadata.updated,
+            lastChecked = System.currentTimeMillis(),
+            isComplete = metadata.isComplete
+            // dateAdded and lastReadAt are preserved from existingFic
+        )
+        
+        ficDao.upsertFic(updatedFic)
+        
+        // Update chapters list
+        val chapterEntities = chapters.map { chapter ->
+            ChapterEntity(
+                chapterId = chapter.id,
+                ficOwnerId = ficId,
+                chapterNumber = chapter.number,
+                title = chapter.title,
+                localPath = null,
+                cachedAt = null,
+                lastReadPosition = 0
+            )
+        }
+        
+        // Preserve cached chapters
+        val existingChapters = chapterDao.getChaptersForFic(ficId)
+        val mergedChapters = chapterEntities.map { newChapter ->
+            val existing = existingChapters.find { it.chapterNumber == newChapter.chapterNumber }
+            if (existing != null) {
+                newChapter.copy(
+                    localPath = existing.localPath,
+                    cachedAt = existing.cachedAt,
+                    lastReadPosition = existing.lastReadPosition
+                )
+            } else {
+                newChapter
+            }
+        }
+        
+        chapterDao.deleteChaptersForFic(ficId)
+        chapterDao.upsertChapters(mergedChapters)
+    }
 }
+
+

@@ -15,5 +15,7 @@ data class FicMetadata(
     val chapters: Int,
     val words: Int,
     val published: String?,
-    val updated: String?
+    val updated: String?,
+    val isComplete: Boolean = false
 )
+

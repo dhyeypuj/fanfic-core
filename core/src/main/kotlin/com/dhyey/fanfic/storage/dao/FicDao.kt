@@ -24,5 +24,9 @@ interface FicDao {
 
     @Query("DELETE FROM fics WHERE ficId = :ficId")
     suspend fun deleteFic(ficId: String)
+
+    @Query("UPDATE fics SET lastReadAt = :timestamp WHERE ficId = :ficId")
+    suspend fun updateLastReadAt(ficId: String, timestamp: Long)
 }
+
 

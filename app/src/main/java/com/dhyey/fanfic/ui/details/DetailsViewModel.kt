@@ -147,6 +147,24 @@ class DetailsViewModel @Inject constructor(
         }
     }
 
+    fun refreshMetadata() {
+        viewModelScope.launch {
+            val currentState = _uiState.value
+            if (currentState !is DetailsUiState.Success) return@launch
+            
+            _uiState.value = DetailsUiState.Loading
+            try {
+                val fic = currentState.fic
+                val metadata = ficFetcher.fetchMetadata(fic.url)
+                val chapters = ficFetcher.fetchChapters(fic.url)
+                repository.updateFicMetadata(ficId, metadata, chapters)
+                loadDetails()
+            } catch (e: Exception) {
+                _uiState.value = DetailsUiState.Error("Failed to refresh: ${e.message}")
+            }
+        }
+    }
+
     fun deleteFic() {
         viewModelScope.launch {
             repository.deleteFic(ficId)
