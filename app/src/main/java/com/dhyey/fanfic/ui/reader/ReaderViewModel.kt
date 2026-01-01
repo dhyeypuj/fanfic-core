@@ -24,7 +24,8 @@ sealed class ReaderUiState {
         val currentChapter: Int,
         val totalChapters: Int,
         val hasPrevious: Boolean,
-        val hasNext: Boolean
+        val hasNext: Boolean,
+        val initialScrollPosition: Int = 0
     ) : ReaderUiState()
     data class Error(val message: String) : ReaderUiState()
 }
@@ -77,8 +78,16 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    private fun loadChapter(chapter: Int) {
+    private fun loadChapter(chapter: Int, saveCurrentPosition: Boolean = true) {
         viewModelScope.launch {
+            // Save current reading position before switching chapters
+            if (saveCurrentPosition) {
+                val currentState = _uiState.value
+                if (currentState is ReaderUiState.Success) {
+                    // Position will be saved by the screen through saveScrollPosition
+                }
+            }
+            
             _uiState.value = ReaderUiState.Loading
 
             try {
@@ -103,6 +112,9 @@ class ReaderViewModel @Inject constructor(
                     fetchAndCacheChapter(ficEntity, chapter)
                 }
 
+                // Get saved reading position for this chapter
+                val savedPosition = repository.getReadingPosition(ficId, chapter)
+
                 currentChapter = chapter
                 _uiState.value = ReaderUiState.Success(
                     chapterTitle = chapterEntity?.title ?: "Chapter $chapter",
@@ -110,7 +122,8 @@ class ReaderViewModel @Inject constructor(
                     currentChapter = chapter,
                     totalChapters = ficEntity.chapters,
                     hasPrevious = chapter > 1,
-                    hasNext = chapter < ficEntity.chapters
+                    hasNext = chapter < ficEntity.chapters,
+                    initialScrollPosition = savedPosition
                 )
             } catch (e: Exception) {
                 _uiState.value = ReaderUiState.Error(e.message ?: "Failed to load chapter")
@@ -143,6 +156,12 @@ class ReaderViewModel @Inject constructor(
         val state = _uiState.value
         if (state is ReaderUiState.Success && state.hasPrevious) {
             loadChapter(currentChapter - 1)
+        }
+    }
+
+    fun saveScrollPosition(scrollY: Int) {
+        viewModelScope.launch {
+            repository.saveReadingPosition(ficId, currentChapter, scrollY)
         }
     }
 

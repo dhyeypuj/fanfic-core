@@ -149,4 +149,15 @@ class FanficRepository(
         val clearedChapters = chapters.map { it.copy(localPath = null, cachedAt = null) }
         chapterDao.upsertChapters(clearedChapters)
     }
+
+    suspend fun saveReadingPosition(ficId: String, chapterNumber: Int, position: Int) {
+        val chapters = chapterDao.getChaptersForFic(ficId)
+        val chapter = chapters.firstOrNull { it.chapterNumber == chapterNumber } ?: return
+        chapterDao.upsertChapters(listOf(chapter.copy(lastReadPosition = position)))
+    }
+
+    suspend fun getReadingPosition(ficId: String, chapterNumber: Int): Int {
+        val chapters = chapterDao.getChaptersForFic(ficId)
+        return chapters.firstOrNull { it.chapterNumber == chapterNumber }?.lastReadPosition ?: 0
+    }
 }

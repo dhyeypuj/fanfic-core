@@ -153,11 +153,28 @@ fun ReaderScreen(
                     AndroidView(
                         factory = {
                             WebView(context).apply {
-                                webViewClient = WebViewClient()
+                                webViewClient = object : WebViewClient() {
+                                    override fun onPageFinished(view: WebView?, url: String?) {
+                                        super.onPageFinished(view, url)
+                                        // Restore scroll position after page loads
+                                        if (state.initialScrollPosition > 0) {
+                                            view?.postDelayed({
+                                                view.scrollTo(0, state.initialScrollPosition)
+                                            }, 100)
+                                        }
+                                    }
+                                }
                                 settings.javaScriptEnabled = false
                                 setBackgroundColor(backgroundColor.toArgb())
                                 isVerticalScrollBarEnabled = false
                                 isHorizontalScrollBarEnabled = false
+                                
+                                // Track scroll position and save when changed
+                                setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
+                                    if (scrollY != oldScrollY) {
+                                        viewModel.saveScrollPosition(scrollY)
+                                    }
+                                }
                                 
                                 // Track touch to distinguish tap from scroll
                                 var touchDownX = 0f
