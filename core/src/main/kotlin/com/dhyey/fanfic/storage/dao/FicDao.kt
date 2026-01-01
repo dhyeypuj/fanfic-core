@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.dhyey.fanfic.storage.entity.FicEntity
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FicDao {
@@ -16,8 +17,12 @@ interface FicDao {
     suspend fun getFicById(ficId: String): FicEntity?
 
     @Query("SELECT * FROM fics")
+    fun observeAllFics(): Flow<List<FicEntity>>
+
+    @Query("SELECT * FROM fics")
     suspend fun getAllFics(): List<FicEntity>
 
     @Query("DELETE FROM fics WHERE ficId = :ficId")
     suspend fun deleteFic(ficId: String)
 }
+

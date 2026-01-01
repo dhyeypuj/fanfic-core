@@ -5,10 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.dhyey.fanfic.storage.dao.FicDao
 import com.dhyey.fanfic.storage.entity.FicEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 sealed class LibraryUiState {
@@ -19,25 +19,21 @@ sealed class LibraryUiState {
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
-    private val ficDao: FicDao
+    ficDao: FicDao
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<LibraryUiState>(LibraryUiState.Loading)
-    val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
-
-    init {
-        loadFics()
-    }
-
-    fun loadFics() {
-        viewModelScope.launch {
-            _uiState.value = LibraryUiState.Loading
-            val fics = ficDao.getAllFics()
-            _uiState.value = if (fics.isEmpty()) {
+    val uiState: StateFlow<LibraryUiState> = ficDao.observeAllFics()
+        .map { fics ->
+            if (fics.isEmpty()) {
                 LibraryUiState.Empty
             } else {
                 LibraryUiState.Success(fics)
             }
         }
-    }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = LibraryUiState.Loading
+        )
 }
+
