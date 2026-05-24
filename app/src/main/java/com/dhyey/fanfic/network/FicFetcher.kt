@@ -58,7 +58,7 @@ class FicFetcher @Inject constructor(
     }
 
     private suspend fun fetchWithOkHttp(url: String): String = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
+        val requestBuilder = Request.Builder()
             .url(url)
             .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
@@ -68,7 +68,12 @@ class FicFetcher @Inject constructor(
             .header("Sec-Fetch-Site", "none")
             .header("Sec-Fetch-User", "?1")
             .header("Upgrade-Insecure-Requests", "1")
-            .build()
+
+        if (url.contains("archiveofourown.org")) {
+            requestBuilder.header("Cookie", "accepted_tos=20180510; view_adult=true")
+        }
+
+        val request = requestBuilder.build()
 
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
@@ -116,9 +121,28 @@ class FicFetcher @Inject constructor(
      * to navigate to a specific chapter. For FFN, only chapterNumber is needed.
      */
     suspend fun fetchChapterContent(baseUrl: String, chapterNumber: Int, chapterId: String? = null): String {
-        val chapterUrl = buildChapterUrl(baseUrl, chapterNumber, chapterId)
+        var resolvedChapterId = chapterId
+        if (baseUrl.contains("archiveofourown.org") && (chapterId == null || !chapterId.startsWith("ao3:"))) {
+            try {
+                val mainHtml = fetchHtml(baseUrl)
+                val doc = org.jsoup.Jsoup.parse(mainHtml)
+                val chapterSelect = doc.selectFirst("select#selected_id")
+                if (chapterSelect != null) {
+                    val options = chapterSelect.select("option")
+                    val option = options.getOrNull(chapterNumber - 1)
+                    if (option != null) {
+                        val numericId = option.attr("value")
+                        resolvedChapterId = "ao3:$numericId"
+                    }
+                }
+            } catch (e: Exception) {
+                // Fallback to passed chapterId
+            }
+        }
+        val chapterUrl = buildChapterUrl(baseUrl, chapterNumber, resolvedChapterId)
         return fetchHtml(chapterUrl)
     }
+
 
     private fun buildChapterUrl(baseUrl: String, chapterNumber: Int, chapterId: String? = null): String {
         return when {

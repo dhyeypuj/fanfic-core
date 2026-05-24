@@ -44,6 +44,8 @@ class WebViewFetcher @Inject constructor(
                 CookieManager.getInstance().apply {
                     setAcceptCookie(true)
                     setAcceptThirdPartyCookies(webView, true)
+                    setCookie("https://archiveofourown.org", "accepted_tos=20180510; path=/; domain=archiveofourown.org")
+                    setCookie("https://archiveofourown.org", "view_adult=true; path=/; domain=archiveofourown.org")
                 }
 
                 var isCompleted = false

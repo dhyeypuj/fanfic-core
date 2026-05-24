@@ -150,94 +150,97 @@ fun ReaderScreen(
                     val textHex = String.format("#%06X", 0xFFFFFF and textColor.toArgb())
                     val context = LocalContext.current
 
-                    AndroidView(
-                        factory = {
-                            WebView(context).apply {
-                                webViewClient = object : WebViewClient() {
-                                    override fun onPageFinished(view: WebView?, url: String?) {
-                                        super.onPageFinished(view, url)
-                                        // Restore scroll position after page loads
-                                        if (state.initialScrollPosition > 0) {
-                                            view?.postDelayed({
-                                                view.scrollTo(0, state.initialScrollPosition)
-                                            }, 100)
+                    androidx.compose.runtime.key(state.currentChapter) {
+                        AndroidView(
+                            factory = {
+                                WebView(context).apply {
+                                    webViewClient = object : WebViewClient() {
+                                        override fun onPageFinished(view: WebView?, url: String?) {
+                                            super.onPageFinished(view, url)
+                                            // Restore scroll position after page loads
+                                            if (state.initialScrollPosition > 0) {
+                                                view?.postDelayed({
+                                                    view.scrollTo(0, state.initialScrollPosition)
+                                                }, 100)
+                                            }
                                         }
                                     }
-                                }
-                                settings.javaScriptEnabled = false
-                                setBackgroundColor(backgroundColor.toArgb())
-                                isVerticalScrollBarEnabled = false
-                                isHorizontalScrollBarEnabled = false
-                                
-                                // Track scroll position and save when changed
-                                setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
-                                    if (scrollY != oldScrollY) {
-                                        viewModel.saveScrollPosition(scrollY)
-                                    }
-                                }
-                                
-                                // Track touch to distinguish tap from scroll
-                                var touchDownX = 0f
-                                var touchDownY = 0f
-                                
-                                setOnTouchListener { view, event ->
-                                    val density = view.context.resources.displayMetrics.density
-                                    val tapThreshold = 20 * density // 20dp movement threshold
+                                    settings.javaScriptEnabled = false
+                                    setBackgroundColor(backgroundColor.toArgb())
+                                    isVerticalScrollBarEnabled = false
+                                    isHorizontalScrollBarEnabled = false
                                     
-                                    when (event.action) {
-                                        MotionEvent.ACTION_DOWN -> {
-                                            touchDownX = event.x
-                                            touchDownY = event.y
+                                    // Track scroll position and save when changed
+                                    setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
+                                        if (scrollY != oldScrollY) {
+                                            viewModel.saveScrollPosition(scrollY)
                                         }
-                                        MotionEvent.ACTION_UP -> {
-                                            val deltaX = kotlin.math.abs(event.x - touchDownX)
-                                            val deltaY = kotlin.math.abs(event.y - touchDownY)
-                                            
-                                            // Only handle as tap if finger didn't move much
-                                            if (deltaX < tapThreshold && deltaY < tapThreshold) {
-                                                val edgeZone = 60 * density
-                                                val width = view.width
-                                                val x = event.x
+                                    }
+                                    
+                                    // Track touch to distinguish tap from scroll
+                                    var touchDownX = 0f
+                                    var touchDownY = 0f
+                                    
+                                    setOnTouchListener { view, event ->
+                                        val density = view.context.resources.displayMetrics.density
+                                        val tapThreshold = 20 * density // 20dp movement threshold
+                                        
+                                        when (event.action) {
+                                            MotionEvent.ACTION_DOWN -> {
+                                                touchDownX = event.x
+                                                touchDownY = event.y
+                                            }
+                                            MotionEvent.ACTION_UP -> {
+                                                val deltaX = kotlin.math.abs(event.x - touchDownX)
+                                                val deltaY = kotlin.math.abs(event.y - touchDownY)
                                                 
-                                                when {
-                                                    // Left edge (60dp) - previous
-                                                    x < edgeZone -> {
-                                                        if (state.hasPrevious) {
-                                                            viewModel.previousChapter()
+                                                // Only handle as tap if finger didn't move much
+                                                if (deltaX < tapThreshold && deltaY < tapThreshold) {
+                                                    val edgeZone = 60 * density
+                                                    val width = view.width
+                                                    val x = event.x
+                                                    
+                                                    when {
+                                                        // Left edge (60dp) - previous
+                                                        x < edgeZone -> {
+                                                            if (state.hasPrevious) {
+                                                                viewModel.previousChapter()
+                                                            }
                                                         }
-                                                    }
-                                                    // Right edge (60dp) - next
-                                                    x > width - edgeZone -> {
-                                                        if (state.hasNext) {
-                                                            viewModel.nextChapter()
+                                                        // Right edge (60dp) - next
+                                                        x > width - edgeZone -> {
+                                                            if (state.hasNext) {
+                                                                viewModel.nextChapter()
+                                                            }
                                                         }
-                                                    }
-                                                    // Center - toggle controls
-                                                    else -> {
-                                                        showControls = !showControls
-                                                        if (!showControls) showQuickSettings = false
+                                                        // Center - toggle controls
+                                                        else -> {
+                                                            showControls = !showControls
+                                                            if (!showControls) showQuickSettings = false
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
+                                        false // Allow scrolling
                                     }
-                                    false // Allow scrolling
                                 }
-                            }
-                        },
-                        update = { webView ->
-                            webView.setBackgroundColor(backgroundColor.toArgb())
-                            val styledHtml = wrapHtmlWithStyle(
-                                state.htmlContent,
-                                bgHex,
-                                textHex,
-                                readerSettings.fontSize,
-                                readerSettings.lineHeight
-                            )
-                            webView.loadDataWithBaseURL(null, styledHtml, "text/html", "UTF-8", null)
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
+                            },
+                            update = { webView ->
+                                webView.setBackgroundColor(backgroundColor.toArgb())
+                                val styledHtml = wrapHtmlWithStyle(
+                                    state.htmlContent,
+                                    bgHex,
+                                    textHex,
+                                    readerSettings.fontSize,
+                                    readerSettings.lineHeight
+                                )
+                                webView.loadDataWithBaseURL(null, styledHtml, "text/html", "UTF-8", null)
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
 
                     // Bottom status bar (always visible)
                     Row(
