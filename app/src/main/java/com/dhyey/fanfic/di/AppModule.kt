@@ -112,6 +112,10 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideAuthService(authService: com.dhyey.fanfic.auth.FirebaseAuthService): com.dhyey.fanfic.auth.AuthService = authService
+
+    @Provides
+    @Singleton
     fun provideFicFetcher(
         okHttpClient: OkHttpClient,
         webViewFetcher: WebViewFetcher

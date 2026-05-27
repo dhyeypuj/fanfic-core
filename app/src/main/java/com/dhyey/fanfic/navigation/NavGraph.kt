@@ -11,11 +11,13 @@ import com.dhyey.fanfic.ui.details.DetailsScreen
 import com.dhyey.fanfic.ui.library.LibraryScreen
 import com.dhyey.fanfic.ui.reader.ReaderScreen
 import com.dhyey.fanfic.ui.settings.SettingsScreen
+import com.dhyey.fanfic.ui.auth.AuthScreen
 
 sealed class Route(val route: String) {
     data object Library : Route("library")
     data object AddFic : Route("add")
     data object Settings : Route("settings")
+    data object Auth : Route("auth")
     data object Details : Route("details/{ficId}") {
         fun createRoute(ficId: String) = "details/$ficId"
     }
@@ -58,6 +60,13 @@ fun FanficNavGraph() {
 
         composable(Route.Settings.route) {
             SettingsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAuth = { navController.navigate(Route.Auth.route) }
+            )
+        }
+
+        composable(Route.Auth.route) {
+            AuthScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }

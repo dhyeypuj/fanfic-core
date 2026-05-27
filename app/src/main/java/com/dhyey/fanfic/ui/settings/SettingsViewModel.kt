@@ -12,11 +12,17 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val chapterCache: ChapterCache
+    private val chapterCache: ChapterCache,
+    private val authService: com.dhyey.fanfic.auth.AuthService,
+    private val syncManager: com.dhyey.fanfic.sync.SyncManager
 ) : ViewModel() {
 
     private val _cacheSize = MutableStateFlow(0L)
     val cacheSize: StateFlow<Long> = _cacheSize.asStateFlow()
+
+    val currentUser = authService.currentUser
+    val isSyncing = syncManager.isSyncing
+    val lastSynced = syncManager.lastSynced
 
     init {
         loadCacheSize()
@@ -36,5 +42,15 @@ class SettingsViewModel @Inject constructor(
             }
             loadCacheSize()
         }
+    }
+
+    fun syncNow() {
+        viewModelScope.launch {
+            syncManager.sync()
+        }
+    }
+
+    fun logOut() {
+        authService.signOut()
     }
 }

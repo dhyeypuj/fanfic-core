@@ -33,8 +33,18 @@ data class RefreshState(
 class LibraryViewModel @Inject constructor(
     private val ficDao: FicDao,
     private val ficFetcher: FicFetcher,
-    private val repository: FanficRepository
+    private val repository: FanficRepository,
+    private val syncManager: com.dhyey.fanfic.sync.SyncManager
 ) : ViewModel() {
+
+    val isSyncing = syncManager.isSyncing
+    val lastSynced = syncManager.lastSynced
+
+    fun syncCloud() {
+        viewModelScope.launch {
+            syncManager.sync()
+        }
+    }
 
     private val _filters = MutableStateFlow(LibraryFilters())
     val filters: StateFlow<LibraryFilters> = _filters.asStateFlow()

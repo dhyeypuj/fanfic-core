@@ -17,4 +17,10 @@ interface ReadingProgressDao {
 
     @Query("SELECT * FROM reading_progress WHERE ficId = :ficId")
     suspend fun getForFic(ficId: String): List<ReadingProgressEntity>
+
+    @Query("DELETE FROM reading_progress WHERE chapterId = :chapterId")
+    suspend fun deleteProgress(chapterId: String)
+
+    @Query("DELETE FROM reading_progress")
+    suspend fun clearAllProgress()
 }

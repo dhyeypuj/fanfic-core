@@ -16,3 +16,6 @@ Thumbs.db
 
 # Offline Samples & Test files
 samples/
+
+# Firebase Credentials
+google-services.json

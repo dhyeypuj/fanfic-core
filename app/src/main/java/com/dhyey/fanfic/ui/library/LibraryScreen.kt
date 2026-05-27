@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,6 +66,7 @@ fun LibraryScreen(
     val uiState by viewModel.uiState.collectAsState()
     val filters by viewModel.filters.collectAsState()
     val refreshState by viewModel.refreshState.collectAsState()
+    val isSyncing by viewModel.isSyncing.collectAsState()
     var showSortMenu by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -120,6 +122,22 @@ fun LibraryScreen(
                             )
                         } else {
                             Icon(Icons.Default.Refresh, contentDescription = "Refresh All")
+                        }
+                    }
+                    IconButton(
+                        onClick = { viewModel.syncCloud() },
+                        enabled = !isSyncing
+                    ) {
+                        if (isSyncing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Sync,
+                                contentDescription = "Cloud Sync"
+                            )
                         }
                     }
                     IconButton(onClick = onSettingsClick) {
