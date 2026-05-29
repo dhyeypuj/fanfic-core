@@ -2,6 +2,9 @@
 
 Fanfic Reader is a modern, feature-rich Android application designed for reading, organizing, and tracking fanfictions from popular sites like **Archive of Our Own (AO3)** and **FanFiction.net (FFN)**. Built entirely with Jetpack Compose, it offers a seamless and highly customizable offline reading experience.
 
+> [!IMPORTANT]
+> **🚀 Download the Latest APK:** Ready to read? Grab the pre-compiled application package from the [Latest Release](https://github.com/dhyeypuj/fanfic-core/releases/latest) and install it directly on your Android device!
+
 ## ✨ Features
 
 - **Offline Reading:** Download your favorite fics and read them anytime, anywhere—no internet connection required.
