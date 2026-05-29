@@ -24,7 +24,8 @@ sealed class ReaderUiState {
         val currentChapter: Int,
         val totalChapters: Int,
         val hasPrevious: Boolean,
-        val hasNext: Boolean
+        val hasNext: Boolean,
+        val initialScrollPosition: Int = 0
     ) : ReaderUiState()
     data class Error(val message: String) : ReaderUiState()
 }
@@ -53,6 +54,10 @@ class ReaderViewModel @Inject constructor(
 
     init {
         loadChapter(initialChapter)
+        // Update lastReadAt for "Last Read" sorting
+        viewModelScope.launch {
+            repository.updateLastRead(ficId)
+        }
     }
 
     fun toggleSettings() {
@@ -77,8 +82,16 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    private fun loadChapter(chapter: Int) {
+    private fun loadChapter(chapter: Int, saveCurrentPosition: Boolean = true) {
         viewModelScope.launch {
+            // Save current reading position before switching chapters
+            if (saveCurrentPosition) {
+                val currentState = _uiState.value
+                if (currentState is ReaderUiState.Success) {
+                    // Position will be saved by the screen through saveScrollPosition
+                }
+            }
+            
             _uiState.value = ReaderUiState.Loading
 
             try {
@@ -91,12 +104,20 @@ class ReaderViewModel @Inject constructor(
                 val chapterEntity = chapters.firstOrNull { it.chapterNumber == chapter }
 
                 val htmlContent = if (chapterEntity?.localPath != null) {
-                    repository.loadChapterContent(chapterEntity)
+                    // Load from cache
+                    try {
+                        repository.loadChapterContent(chapterEntity)
+                    } catch (e: Exception) {
+                        // Cache corrupted, re-fetch
+                        fetchAndCacheChapter(ficEntity, chapter, chapterEntity?.chapterId)
+                    }
                 } else {
-                    val html = ficFetcher.fetchChapterContent(ficEntity.url, chapter)
-                    // Extract story content from HTML
-                    extractStoryContent(html)
+                    // Fetch and cache for offline use
+                    fetchAndCacheChapter(ficEntity, chapter, chapterEntity?.chapterId)
                 }
+
+                // Get saved reading position for this chapter
+                val savedPosition = repository.getReadingPosition(ficId, chapter)
 
                 currentChapter = chapter
                 _uiState.value = ReaderUiState.Success(
@@ -105,12 +126,32 @@ class ReaderViewModel @Inject constructor(
                     currentChapter = chapter,
                     totalChapters = ficEntity.chapters,
                     hasPrevious = chapter > 1,
-                    hasNext = chapter < ficEntity.chapters
+                    hasNext = chapter < ficEntity.chapters,
+                    initialScrollPosition = savedPosition
                 )
             } catch (e: Exception) {
                 _uiState.value = ReaderUiState.Error(e.message ?: "Failed to load chapter")
             }
         }
+    }
+
+    private suspend fun fetchAndCacheChapter(ficEntity: FicEntity, chapter: Int, chapterId: String? = null): String {
+        // Pass chapterId for AO3 individual chapter navigation
+        val html = ficFetcher.fetchChapterContent(ficEntity.url, chapter, chapterId)
+        // Use site-aware content parsing from FicFetcher
+        val storyContent = ficFetcher.parseChapterContent(html, ficEntity.url)
+        
+        // If parseChapterContent returns empty, fallback to legacy extraction
+        val contentToCache = storyContent.ifBlank { extractStoryContent(html) }
+        
+        // Cache for offline reading (10MB max cache)
+        try {
+            repository.cacheChapterContent(ficEntity.ficId, chapter, contentToCache, 10 * 1024 * 1024)
+        } catch (e: Exception) {
+            // Caching failed, but we can still show the content
+        }
+        
+        return contentToCache
     }
 
     fun nextChapter() {
@@ -124,6 +165,12 @@ class ReaderViewModel @Inject constructor(
         val state = _uiState.value
         if (state is ReaderUiState.Success && state.hasPrevious) {
             loadChapter(currentChapter - 1)
+        }
+    }
+
+    fun saveScrollPosition(scrollY: Int) {
+        viewModelScope.launch {
+            repository.saveReadingPosition(ficId, currentChapter, scrollY)
         }
     }
 

@@ -3,6 +3,7 @@ package com.dhyey.fanfic.ui.details
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dhyey.fanfic.network.FicFetcher
 import com.dhyey.fanfic.repository.FanficRepository
 import com.dhyey.fanfic.storage.entity.ChapterEntity
 import com.dhyey.fanfic.storage.entity.FicEntity
@@ -19,16 +20,27 @@ sealed class DetailsUiState {
     data class Error(val message: String) : DetailsUiState()
 }
 
+data class DownloadState(
+    val isDownloading: Boolean = false,
+    val progress: Int = 0,
+    val total: Int = 0,
+    val currentChapter: String = ""
+)
+
 @HiltViewModel
 class DetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val repository: FanficRepository
+    private val repository: FanficRepository,
+    private val ficFetcher: FicFetcher
 ) : ViewModel() {
 
     private val ficId: String = savedStateHandle.get<String>("ficId") ?: ""
 
     private val _uiState = MutableStateFlow<DetailsUiState>(DetailsUiState.Loading)
     val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
+
+    private val _downloadState = MutableStateFlow(DownloadState())
+    val downloadState: StateFlow<DownloadState> = _downloadState.asStateFlow()
 
     init {
         loadDetails()
@@ -52,9 +64,123 @@ class DetailsViewModel @Inject constructor(
         }
     }
 
+    fun downloadAllChapters() {
+        val state = _uiState.value
+        if (state !is DetailsUiState.Success || _downloadState.value.isDownloading) return
+
+        viewModelScope.launch {
+            val fic = state.fic
+            val chapters = state.chapters
+            val uncachedChapters = chapters.filter { it.localPath == null }
+
+            if (uncachedChapters.isEmpty()) return@launch
+
+            _downloadState.value = DownloadState(
+                isDownloading = true,
+                progress = 0,
+                total = uncachedChapters.size
+            )
+
+            uncachedChapters.forEachIndexed { index, chapter ->
+                try {
+                    _downloadState.value = _downloadState.value.copy(
+                        progress = index,
+                        currentChapter = chapter.title
+                    )
+
+                    val html = ficFetcher.fetchChapterContent(fic.url, chapter.chapterNumber, chapter.chapterId)
+                    val storyContent = ficFetcher.parseChapterContent(html, fic.url).ifBlank { extractStoryContent(html) }
+                    repository.cacheChapterContent(ficId, chapter.chapterNumber, storyContent, 50 * 1024 * 1024)
+                } catch (e: Exception) {
+                    // Skip failed chapters, continue with others
+                }
+            }
+
+            _downloadState.value = DownloadState(isDownloading = false)
+            loadDetails() // Refresh to show updated cache status
+        }
+    }
+
+    fun cancelDownload() {
+        _downloadState.value = DownloadState(isDownloading = false)
+    }
+
+    fun clearChapterCache(chapterNumber: Int) {
+        viewModelScope.launch {
+            repository.clearChapterCache(ficId, chapterNumber)
+            loadDetails()
+        }
+    }
+
+    fun downloadSingleChapter(chapterNumber: Int) {
+        val state = _uiState.value
+        if (state !is DetailsUiState.Success || _downloadState.value.isDownloading) return
+
+        viewModelScope.launch {
+            val fic = state.fic
+            val chapter = state.chapters.firstOrNull { it.chapterNumber == chapterNumber } ?: return@launch
+
+            _downloadState.value = DownloadState(
+                isDownloading = true,
+                progress = 0,
+                total = 1,
+                currentChapter = chapter.title
+            )
+
+            try {
+                val html = ficFetcher.fetchChapterContent(fic.url, chapterNumber, chapter.chapterId)
+                val storyContent = ficFetcher.parseChapterContent(html, fic.url).ifBlank { extractStoryContent(html) }
+                repository.cacheChapterContent(ficId, chapterNumber, storyContent, 50 * 1024 * 1024)
+            } catch (e: Exception) {
+                // Download failed
+            }
+
+            _downloadState.value = DownloadState(isDownloading = false)
+            loadDetails()
+        }
+    }
+
+    fun clearAllOfflineCache() {
+        viewModelScope.launch {
+            repository.clearAllOfflineCache(ficId)
+            loadDetails()
+        }
+    }
+
+    fun refreshMetadata() {
+        viewModelScope.launch {
+            val currentState = _uiState.value
+            if (currentState !is DetailsUiState.Success) return@launch
+            
+            _uiState.value = DetailsUiState.Loading
+            try {
+                val fic = currentState.fic
+                val metadata = ficFetcher.fetchMetadata(fic.url)
+                val chapters = ficFetcher.fetchChapters(fic.url)
+                repository.updateFicMetadata(ficId, metadata, chapters)
+                loadDetails()
+            } catch (e: Exception) {
+                _uiState.value = DetailsUiState.Error("Failed to refresh: ${e.message}")
+            }
+        }
+    }
+
     fun deleteFic() {
         viewModelScope.launch {
             repository.deleteFic(ficId)
         }
     }
+
+    private fun extractStoryContent(html: String): String {
+        return try {
+            val doc = org.jsoup.Jsoup.parse(html)
+            doc.selectFirst("#storytext")?.html()
+                ?: doc.selectFirst("div.storycontent")?.html()
+                ?: doc.selectFirst("article")?.html()
+                ?: html
+        } catch (e: Exception) {
+            html
+        }
+    }
 }
+

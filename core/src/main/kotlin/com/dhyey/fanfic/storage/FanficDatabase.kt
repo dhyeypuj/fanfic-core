@@ -15,7 +15,7 @@ import com.dhyey.fanfic.storage.entity.ReadingProgressEntity
         ChapterEntity::class,
         ReadingProgressEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class FanficDatabase : RoomDatabase() {

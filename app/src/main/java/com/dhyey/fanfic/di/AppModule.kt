@@ -34,7 +34,18 @@ object AppModule {
             context,
             FanficDatabase::class.java,
             "fanfic_database"
-        ).build()
+        )
+            .addMigrations(MIGRATION_1_2)
+            .build()
+    }
+    
+    private val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+        override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+            // Add new columns for sorting/filtering with default values
+            db.execSQL("ALTER TABLE fics ADD COLUMN dateAdded INTEGER NOT NULL DEFAULT ${System.currentTimeMillis()}")
+            db.execSQL("ALTER TABLE fics ADD COLUMN lastReadAt INTEGER DEFAULT NULL")
+            db.execSQL("ALTER TABLE fics ADD COLUMN isComplete INTEGER NOT NULL DEFAULT 0")
+        }
     }
 
     @Provides
@@ -50,8 +61,8 @@ object AppModule {
     @Provides
     @Singleton
     fun provideChapterCache(@ApplicationContext context: Context): ChapterCache {
-        val cacheDir = File(context.cacheDir, "chapters")
-        return ChapterCache(cacheDir)
+        val filesDir = File(context.filesDir, "chapters")
+        return ChapterCache(filesDir)
     }
 
     @Provides
@@ -98,6 +109,10 @@ object AppModule {
             .writeTimeout(30, TimeUnit.SECONDS)
             .build()
     }
+
+    @Provides
+    @Singleton
+    fun provideAuthService(authService: com.dhyey.fanfic.auth.FirebaseAuthService): com.dhyey.fanfic.auth.AuthService = authService
 
     @Provides
     @Singleton

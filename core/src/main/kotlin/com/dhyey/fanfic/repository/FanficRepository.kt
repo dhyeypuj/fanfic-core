@@ -35,7 +35,10 @@ class FanficRepository(
             words = metadata.words,
             published = metadata.published,
             updated = metadata.updated,
-            lastChecked = System.currentTimeMillis()
+            lastChecked = System.currentTimeMillis(),
+            dateAdded = System.currentTimeMillis(),
+            lastReadAt = null,
+            isComplete = metadata.isComplete
         )
 
         ficDao.upsertFic(ficEntity)
@@ -128,4 +131,68 @@ class FanficRepository(
 
     suspend fun getChapters(ficId: String): List<ChapterEntity> =
         chapterDao.getChaptersForFic(ficId)
+
+    suspend fun clearChapterCache(ficId: String, chapterNumber: Int) {
+        val chapters = chapterDao.getChaptersForFic(ficId)
+        val chapter = chapters.firstOrNull { it.chapterNumber == chapterNumber } ?: return
+        
+        chapter.localPath?.let { path ->
+            chapterCache.deleteChapter(path)
+        }
+        
+        chapterDao.upsertChapters(
+            listOf(chapter.copy(localPath = null, cachedAt = null))
+        )
+    }
+
+    suspend fun clearAllOfflineCache(ficId: String) {
+        chapterCache.deleteFicCache(ficId)
+        
+        val chapters = chapterDao.getChaptersForFic(ficId)
+        val clearedChapters = chapters.map { it.copy(localPath = null, cachedAt = null) }
+        chapterDao.upsertChapters(clearedChapters)
+    }
+
+    suspend fun saveReadingPosition(ficId: String, chapterNumber: Int, position: Int) {
+        val chapters = chapterDao.getChaptersForFic(ficId)
+        val chapter = chapters.firstOrNull { it.chapterNumber == chapterNumber } ?: return
+        chapterDao.upsertChapters(listOf(chapter.copy(lastReadPosition = position)))
+    }
+
+    suspend fun getReadingPosition(ficId: String, chapterNumber: Int): Int {
+        val chapters = chapterDao.getChaptersForFic(ficId)
+        return chapters.firstOrNull { it.chapterNumber == chapterNumber }?.lastReadPosition ?: 0
+    }
+
+    suspend fun updateLastRead(ficId: String) {
+        ficDao.updateLastReadAt(ficId, System.currentTimeMillis())
+    }
+
+    /**
+     * Updates an existing fic's metadata from fresh data.
+     * ONLY updates the FicEntity - does NOT touch chapters at all to preserve cache.
+     */
+    suspend fun updateFicMetadata(ficId: String, metadata: FicMetadata, chapters: List<Chapter>) {
+        val existingFic = ficDao.getFicById(ficId) ?: return
+        
+        // Update ONLY fic metadata - completely skip chapter operations
+        val updatedFic = existingFic.copy(
+            title = metadata.title,
+            author = metadata.author,
+            chapters = metadata.chapters,
+            words = metadata.words,
+            published = metadata.published,
+            updated = metadata.updated,
+            lastChecked = System.currentTimeMillis(),
+            isComplete = metadata.isComplete
+            // dateAdded and lastReadAt are preserved from existingFic
+        )
+        ficDao.updateFic(updatedFic)  // Use updateFic, NOT upsertFic, to avoid CASCADE DELETE
+        
+        // DO NOT touch chapters - they are already in database with cache info
+        // New chapters will be discovered when user opens reader and navigates
+    }
 }
+
+
+
