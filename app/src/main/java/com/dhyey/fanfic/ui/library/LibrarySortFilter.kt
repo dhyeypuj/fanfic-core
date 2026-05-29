@@ -34,6 +34,7 @@ enum class StatusFilter(val displayName: String) {
  * Current filter/sort state for the library
  */
 data class LibraryFilters(
+    val query: String = "",
     val sort: SortOption = SortOption.DATE_ADDED,
     val sortAscending: Boolean = false,  // false = descending (newest/highest first)
     val source: SourceFilter = SourceFilter.ALL,

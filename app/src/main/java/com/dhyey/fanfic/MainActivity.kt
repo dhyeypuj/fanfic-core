@@ -14,6 +14,7 @@ import com.dhyey.fanfic.sync.SyncManager
 import com.dhyey.fanfic.ui.theme.FanficReaderTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -22,13 +23,25 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var syncManager: SyncManager
 
+    @Inject
+    lateinit var ficDao: com.dhyey.fanfic.storage.dao.FicDao
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Asynchronously auto-sync on app startup
-        lifecycleScope.launch {
-            syncManager.sync()
+        // No more seed data
+
+        // Sync on app startup if already logged in
+        val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+        if (auth.currentUser != null) {
+            lifecycleScope.launch {
+                try {
+                    syncManager.sync()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
         }
 
         setContent {

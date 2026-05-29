@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 sealed class LibraryUiState {
@@ -42,7 +44,12 @@ class LibraryViewModel @Inject constructor(
 
     fun syncCloud() {
         viewModelScope.launch {
-            syncManager.sync()
+            val result = syncManager.sync()
+            if (result.isFailure) {
+                android.util.Log.e("FanficDebug", "Sync failed", result.exceptionOrNull())
+            } else {
+                android.util.Log.d("FanficDebug", "Sync success")
+            }
         }
     }
 
@@ -60,6 +67,11 @@ class LibraryViewModel @Inject constructor(
             LibraryUiState.Empty
         } else {
             val filteredFics = fics
+                .filter { fic -> 
+                    filters.query.isBlank() || 
+                    fic.title.contains(filters.query, ignoreCase = true) || 
+                    fic.author.contains(filters.query, ignoreCase = true)
+                }
                 .filter { fic -> matchesSourceFilter(fic, filters.source) }
                 .filter { fic -> matchesStatusFilter(fic, filters.status) }
             
@@ -76,6 +88,10 @@ class LibraryViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = LibraryUiState.Loading
     )
+
+    fun setSearchQuery(query: String) {
+        _filters.value = _filters.value.copy(query = query)
+    }
 
     fun setSort(option: SortOption) {
         _filters.value = _filters.value.copy(sort = option)

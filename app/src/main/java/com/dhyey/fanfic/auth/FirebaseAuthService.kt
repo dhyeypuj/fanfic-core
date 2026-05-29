@@ -20,6 +20,10 @@ class FirebaseAuthService @Inject constructor() : AuthService {
     init {
         // Track authentication changes
         _currentUser.value = firebaseAuth.currentUser
+        
+        // Disable reCAPTCHA for emulator testing to prevent broken pipe errors
+        firebaseAuth.firebaseAuthSettings.setAppVerificationDisabledForTesting(true)
+        
         firebaseAuth.addAuthStateListener { auth ->
             _currentUser.value = auth.currentUser
         }
