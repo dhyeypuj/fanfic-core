@@ -33,7 +33,7 @@ This project is built using modern Android development practices and tools:
 ### Installation & Setup
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/fanfic-reader.git
+   git clone https://github.com/dhyeypuj/fanfic-core.git
    ```
 2. **Open the project in Android Studio.**
 3. **Firebase Setup:**
