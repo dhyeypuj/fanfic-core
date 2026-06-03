@@ -18,6 +18,8 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
+import timber.log.Timber
+
 sealed class LibraryUiState {
     data object Loading : LibraryUiState()
     data object Empty : LibraryUiState()
@@ -46,9 +48,9 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch {
             val result = syncManager.sync()
             if (result.isFailure) {
-                android.util.Log.e("FanficDebug", "Sync failed", result.exceptionOrNull())
+                Timber.e(result.exceptionOrNull(), "Sync failed")
             } else {
-                android.util.Log.d("FanficDebug", "Sync success")
+                Timber.d("Sync success")
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.dhyey.fanfic.auth
 
+import com.dhyey.fanfic.BuildConfig
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,8 +22,10 @@ class FirebaseAuthService @Inject constructor() : AuthService {
         // Track authentication changes
         _currentUser.value = firebaseAuth.currentUser
         
-        // Disable reCAPTCHA for emulator testing to prevent broken pipe errors
-        firebaseAuth.firebaseAuthSettings.setAppVerificationDisabledForTesting(true)
+        // Disable reCAPTCHA for emulator testing to prevent broken pipe errors in debug builds
+        if (BuildConfig.DEBUG) {
+            firebaseAuth.firebaseAuthSettings.setAppVerificationDisabledForTesting(true)
+        }
         
         firebaseAuth.addAuthStateListener { auth ->
             _currentUser.value = auth.currentUser

@@ -191,7 +191,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Fanfic Reader v1.0.0",
+                        text = "Fanfic Reader v${com.dhyey.fanfic.BuildConfig.VERSION_NAME}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

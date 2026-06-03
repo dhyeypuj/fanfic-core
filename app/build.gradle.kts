@@ -16,16 +16,28 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
+// Load version properties
+val versionPropertiesFile = rootProject.file("version.properties")
+val versionProperties = Properties()
+if (versionPropertiesFile.exists()) {
+    versionProperties.load(FileInputStream(versionPropertiesFile))
+}
+
+val versionMajor = versionProperties["VERSION_MAJOR"]?.toString()?.toIntOrNull() ?: 1
+val versionMinor = versionProperties["VERSION_MINOR"]?.toString()?.toIntOrNull() ?: 0
+val versionPatch = versionProperties["VERSION_PATCH"]?.toString()?.toIntOrNull() ?: 0
+
 android {
     namespace = "com.dhyey.fanfic"
     compileSdk = 34
 
     defaultConfig {
         applicationId = "com.dhyey.fanfic"
-        minSdk = 24
+        minSdk = 29
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        
+        versionCode = versionMajor * 1000000 + versionMinor * 1000 + versionPatch
+        versionName = "$versionMajor.$versionMinor.$versionPatch"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -62,6 +74,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
@@ -71,6 +84,18 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val output = this as com.android.build.gradle.api.ApkVariantOutput
+            output.outputFileName = if (variant.buildType.name == "release") {
+                "FanficReader.apk"
+            } else {
+                "FanficReader-Debug.apk"
+            }
         }
     }
 }
@@ -111,6 +136,8 @@ dependencies {
     // Room
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
+    implementation("androidx.sqlite:sqlite-ktx:2.4.0")
+    implementation("net.zetetic:android-database-sqlcipher:4.5.4")
 
     // WorkManager
     implementation("androidx.work:work-runtime-ktx:2.9.0")
@@ -119,6 +146,7 @@ dependencies {
 
     // Core
     implementation("androidx.core:core-ktx:1.12.0")
+    implementation("com.jakewharton.timber:timber:5.0.1")
 
     // DataStore for preferences
     implementation("androidx.datastore:datastore-preferences:1.0.0")

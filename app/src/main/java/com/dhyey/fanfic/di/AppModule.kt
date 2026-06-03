@@ -23,6 +23,9 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
+import com.dhyey.fanfic.security.DatabaseKeyManager
+import net.sqlcipher.database.SupportFactory
+
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
@@ -30,11 +33,16 @@ object AppModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): FanficDatabase {
+        val keyManager = DatabaseKeyManager(context)
+        val passphrase = keyManager.getOrCreatePassphrase()
+        val factory = SupportFactory(passphrase)
+
         return Room.databaseBuilder(
             context,
             FanficDatabase::class.java,
             "fanfic_database"
         )
+            .openHelperFactory(factory)
             .addMigrations(MIGRATION_1_2)
             .build()
     }
